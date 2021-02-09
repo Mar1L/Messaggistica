@@ -49,25 +49,25 @@ uint16_t server_port;		//porta su cui il server ascolta
 typedef enum {ONLINE, OFFLINE} connection;
 
 // MESSAGGI OFFLINE
-struct message{
+typedef struct message {
 	char *sender;
 	char *buffer;
 	struct message *next;
-};
+} message;
 	
 // CLIENT
-struct client {
+typedef struct client {
 	char *nickname;
 	char *ip;
 	uint16_t UDP_port;
 	int socket;
 	connection state;
-	struct message *msg_list;
+	message *msg_list;
 	struct client *next;
-};
+} client;
 
 // Puntatore alla testa della lista dei client
-struct client *head;
+client *head;
 
 
 
@@ -136,8 +136,8 @@ void send_response_msg(int sd, char* code){
 
 //------------------FUNZIONI PER LA GESTIONE DEI CLIENT----------------------
 // Funzione ausiliaria che alloca un client e ne inizializza i campi
-struct client* create_client(int socket, char* name, uint16_t port, char* ip){
-	struct client *new_client = (struct client*)malloc(sizeof(struct client));
+client* create_client(int socket, char* name, uint16_t port, char* ip){
+	client *new_client = (client*)malloc(sizeof(client));
 	
 	if(!new_client){
 		//gestione memoria piena
@@ -157,9 +157,9 @@ struct client* create_client(int socket, char* name, uint16_t port, char* ip){
 }
 
 /*Chiama la funzione client_create, poi inserisce il client appena creato nella lista in ordine alfabetico di nome*/
-struct client* insert_client(int socket, char* name, uint16_t port, char* ip){
-	struct client *p, *q;
-	struct client *new = create_client(socket, name, port, ip);
+client* insert_client(int socket, char* name, uint16_t port, char* ip){
+	client *p, *q;
+	client *new = create_client(socket, name, port, ip);
 	if(!new)
 		return NULL;
 	
@@ -178,8 +178,8 @@ struct client* insert_client(int socket, char* name, uint16_t port, char* ip){
 }
 
 //Funzione che estrae un client dalla lista e ne restituisce un puntatore perchè venga deallocato
-struct client* remove_client(int sd){
-	struct client *p, *q;
+client* remove_client(int sd){
+	client *p, *q;
 	
 	//lista vuota, il client non verrà trovato
 	if(head == NULL)	
@@ -197,36 +197,36 @@ struct client* remove_client(int sd){
 	return p;
 }
 
-void delete_client(struct client* cl){
+void delete_client(client* cl){
 	free(cl->nickname);
 	free(cl->ip);
 	free(cl);
 }
 
 //Funzione che assegna lo stato con all'utente
-void set_client_state(struct client *cl, connection con){
+void set_client_state(client *cl, connection con){
 	cl->state = con;
 }
 
 //Funzione che cerca un client in base al socket e ne restituisce un puntatore
-struct client* find_client_by_socket(int sd){
-	struct client *p;
+client* find_client_by_socket(int sd){
+	client *p;
 	for(p = head; p && (p->socket != sd); p = p->next);
 
 	return p;
 }
 
 //Funzione che restituisce un puntatore al un client del quale si fornisce l'username  
-struct client* find_client_by_name(char *name){
+client* find_client_by_name(char *name){
 	//ricerca client nella lista
-	struct client *p;
+	client *p;
 	for(p = head; p && (strcmp(p->nickname, name) != 0); p = p->next);
 	
 	return p;
 }
 
 /*Funzione che prepara il client per la riconnessione copiando nel corrispondente elemento delle lista ip, porta e socket*/
-void client_reconnection(int sd, struct client *cl, uint16_t port, char *ip){
+void client_reconnection(int sd, client *cl, uint16_t port, char *ip){
 	cl->ip = (char *)malloc(strlen(ip) + 1);
 	strcpy(cl->ip, ip);
 	cl->UDP_port = port;
@@ -234,7 +234,7 @@ void client_reconnection(int sd, struct client *cl, uint16_t port, char *ip){
 }
 
 /*Funzione che mette nel buffer porta UDP e ip del client destinatario, il risultato verrà inviato al mittente perchè possa iniziare una connessione UDP*/
-void prepare_udp_ini(struct client *receiver){
+void prepare_udp_ini(client *receiver){
 	memset(&buffer, '\0', BUF_SIZE);
 	sprintf(buffer, "%u", receiver->UDP_port);
 	strcat(buffer, " ");
@@ -245,8 +245,8 @@ void prepare_udp_ini(struct client *receiver){
 
 //---------------------FUNZIONI PER I MESSAGGI-------------------------
 /*Crea un messaggio contenente il nome del mittente */
-struct message* create_msg(struct client *sender){	
-	struct message *new = (struct message *)malloc(sizeof(struct message));
+message* create_msg(client *sender){	
+	message *new = (message *)malloc(sizeof(message));
 	
 	new->buffer = (char *)malloc(strlen(buffer) + 1);
 	new->sender = (char *)malloc(strlen(sender->nickname) + 1);
@@ -258,9 +258,9 @@ struct message* create_msg(struct client *sender){
 }
 
 //Funzione che inserisce un messaggio creato con create_msg nella lista messaggi dell'utente destinatario
-void insert_msg(struct client *sender, struct client *receiver){
-	struct message *p;
-	struct message *m = create_msg(sender);
+void insert_msg(client *sender, client *receiver){
+	message *p;
+	message *m = create_msg(sender);
 		
 	m->next = NULL;
 	
@@ -278,9 +278,9 @@ void insert_msg(struct client *sender, struct client *receiver){
 
 
 //Funzione che invia tutti i messaggi offline all'utente che si riconnette
-void send_msg(int sd, struct client *receiver){
-	struct message *aux;	//lo uso per mettere il messaggio nel buffer per poi mandarlo
-	struct message *delete;	//lo uso per eliminare il messaggio dopo averlo mandato
+void send_msg(int sd, client *receiver){
+	message *aux;	//lo uso per mettere il messaggio nel buffer per poi mandarlo
+	message *delete;	//lo uso per eliminare il messaggio dopo averlo mandato
 
 		//creo una stringa per ogni messaggio offline da mandare al client
 		for(aux = receiver->msg_list; aux != NULL;){	
@@ -337,7 +337,7 @@ void rm_sock(int sd);
 
 //Funzione che registra un utente presso il server
 void register_client(int sd, char *username){
-	struct client* aux;
+	client* aux;
 	char *port;
 	char *ip;
 	char *name = (char *)malloc(strlen(username) + 1);	//variabile di appoggio per il nome
@@ -384,7 +384,7 @@ void register_client(int sd, char *username){
 
 //Funzione che deregistra un utente presso il server cancellando le relative stutture dati
 void deregister(int sd){
-	struct client *aux = remove_client(sd);	//rimuove il client dalla lista e lo restituisce
+	client *aux = remove_client(sd);	//rimuove il client dalla lista e lo restituisce
 	
 	//controllo che il client sia registrato
 	if(!aux){	
@@ -402,7 +402,7 @@ void deregister(int sd){
 
 //Funzione che invia un elenco degli utenti registrati
 void who(int sd){
-	struct client *work = head;
+	client *work = head;
 	if(!work){
 		strcpy(buffer, "Non ci sono utenti attualmente registrati\0");
 		send_TCP_msg(sd, buffer);
@@ -427,8 +427,8 @@ void who(int sd){
 //Funzione che manda un messaggio dall'utente sul socket sd all' utente con nome rec 
 void send_client(int sd, char *rec){
 	//printf("Send\n");
-	struct client *receiver;
-	struct client *sender;
+	client *receiver;
+	client *sender;
 	
 	//cerco il mittente tramite il socket
 	sender = find_client_by_socket(sd);	
@@ -465,7 +465,7 @@ void send_client(int sd, char *rec){
 
 //Funzione che disconnette 'utente sul socket sd
 void quit(int sd){
-	struct client *aux = find_client_by_socket(sd);
+	client *aux = find_client_by_socket(sd);
 	if(!aux){	//l'utente si disconnette senza essersi registrato
 		printf("Disconnessione utente non registrato\n");
 		rm_sock(sd);
@@ -629,8 +629,7 @@ int main(int argc, char *argv[]){
     	
 	//creazione socket e gestione indirizzo
 	connection_ini();
-	//accetta la connessione
-	//connection_handler(sd, connecting_sd, client_addr);
+	
 	return 0;
 }
 
